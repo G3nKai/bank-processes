@@ -3,6 +3,7 @@ using CoreService.Data;
 using CoreService.DTOs.Requests;
 using CoreService.DTOs.Responses;
 using CoreService.Entities;
+using CoreService.Enums;
 using CoreService.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -91,6 +92,17 @@ public class InternalCoreController : ControllerBase
             accountNew.Balance -= (decimal)amount;
             accountNew.Balance = Math.Round(accountNew.Balance, 2);
 
+            _dbContext.Transactions.Add(new CoreService.Entities.Transaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountNew.Id,
+                Type = CoreService.Enums.TransactionType.CREDIT_PAYMENT,
+                Amount = (decimal)amount,
+                Description = "Credit payment",
+                Timestamp = DateTime.UtcNow,
+                BalanceAfter = accountNew.Balance
+            });
+
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             return Ok(true);
@@ -98,11 +110,35 @@ public class InternalCoreController : ControllerBase
          
         if ((double)account.Balance < amount)
         {
-            return BadRequest();//badRequest должен быть
+            _dbContext.Transactions.Add(new Transaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = account.Id,
+                Type = TransactionType.PAYMENT_FAIL,
+                Amount = (decimal)amount,
+                Description = "Not enough money on balance",
+                Timestamp = DateTime.UtcNow,
+                BalanceAfter = account.Balance
+            });
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return BadRequest("Not enough money on balance");
         }
 
         account.Balance -= (decimal)amount;
         account.Balance = Math.Round(account.Balance, 2);
+
+        _dbContext.Transactions.Add(new CoreService.Entities.Transaction
+        {
+            Id = Guid.NewGuid(),
+            AccountId = account.Id,
+            Type = CoreService.Enums.TransactionType.CREDIT_PAYMENT,
+            Amount = (decimal)amount,
+            Description = "Credit payment",
+            Timestamp = DateTime.UtcNow,
+            BalanceAfter = account.Balance
+        });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
